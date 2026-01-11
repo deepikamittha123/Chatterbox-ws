@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Chatterbox</title>
+
+<style>
+body {
+    font-family: "Segoe UI", Arial;
+    background: #f4f6fb;
+    display: flex;
+    justify-content: center;
+    padding-top: 40px;
+}
+
+.container {
+    width: 420px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    padding: 15px;
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+select, input, button {
+    width: 100%;
+    padding: 8px;
+    margin-top: 6px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+#chat {
+    height: 260px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 5px;
+}
+
+.message {
+    margin-bottom: 5px;
+}
+
+.system {
+    color: gray;
+    font-style: italic;
+    text-align: center;
+}
+
+#typing {
+    font-size: 13px;
+    color: green;
+    margin-top: 4px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h2>Chatterbox 💬</h2>
+
+<select id="room" onchange="switchRoom()">
+    <option value="general">General</option>
+    <option value="tech">Tech</option>
+    <option value="fun">Fun</option>
+</select>
+
+<div id="chat"></div>
+<div id="typing"></div>
+
+<input id="msg" placeholder="Type message..." />
+<button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const typingDiv = document.getElementById("typing");
+const msgInput = document.getElementById("msg");
+const roomSelect = document.getElementById("room");
+
+const username = prompt("Enter your name");
+let socket;
+let currentRoom = roomSelect.value;
+
+function connect() {
+    socket = new WebSocket("ws://localhost:8000/ws");
+
+    socket.onopen = () => {
+        socket.send(JSON.stringify({
+            username: username,
+            room: currentRoom
+        }));
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "chat") {
+            addMessage(`${data.username}: ${data.message}`);
+        }
+
+        if (data.type === "system") {
+            addMessage(data.message, true);
+        }
+
+        if (data.type === "typing") {
+            typingDiv.innerText = `${data.username} is typing...`;
+        }
+
+        if (data.type === "stop_typing") {
+            typingDiv.innerText = "";
+        }
+    };
+}
+
+function switchRoom() {
+    if (socket) socket.close();
+    chat.innerHTML = "";
+    typingDiv.innerText = "";
+    currentRoom = roomSelect.value;
+    connect();
+}
+
+function addMessage(text, system=false) {
+    const div = document.createElement("div");
+    div.className = system ? "system" : "message";
+    div.innerText = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function sendMessage() {
+    if (!msgInput.value) return;
+
+    socket.send(JSON.stringify({
+        type: "chat",
+        message: msgInput.value
+    }));
+
+    msgInput.value = "";
+    socket.send(JSON.stringify({ type: "stop_typing" }));
+}
+
+msgInput.addEventListener("input", () => {
+    socket.send(JSON.stringify({ type: "typing" }));
+});
+
+connect();
+</script>
+
+</body>
+</html>
