@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chatterbox - Milestone 2 Demo</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #chat-box {
+            border: 1px solid #ccc;
+            height: 300px;
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin: 5px 0;
+        }
+
+        .username {
+            font-weight: bold;
+        }
+
+        .system {
+            color: gray;
+            font-style: italic;
+        }
+
+        #input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 8px;
+        }
+
+        #sendBtn {
+            padding: 8px 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Chatterbox - Milestone 2 (FastAPI WebSocket Chat)</h2>
+
+<div id="chat-box"></div>
+
+<div id="input-row">
+    <input id="messageInput" type="text"
+           placeholder="Type a message and press Enter...">
+    <button id="sendBtn">Send</button>
+</div>
+
+<script>
+    const chatBox = document.getElementById("chat-box");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    // Ask for username
+    let username = "";
+    while (!username) {
+        username = prompt("Enter your name:");
+        if (username) username = username.trim();
+    }
+
+    // Create WebSocket connection
+    const socket = new WebSocket("ws://localhost:8000/ws");
+
+    socket.onopen = () => {
+        console.log("Connected to server");
+        socket.send(JSON.stringify({
+            type: "join",
+            username: username
+        }));
+        addSystemMessage("You joined the chat as " + username);
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "chat") {
+            addChatMessage(data.username, data.message);
+        } else if (data.type === "system") {
+            addSystemMessage(data.message);
+        }
+    };
+
+    socket.onclose = () => {
+        addSystemMessage("Connection closed.");
+    };
+
+    socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        addSystemMessage("Error occurred in WebSocket.");
+    };
+
+    function addChatMessage(user, message) {
+        const div = document.createElement("div");
+        div.classList.add("message");
+        div.innerHTML = `<span class="username">${user}:</span> ${message}`;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function addSystemMessage(message) {
+        const div = document.createElement("div");
+        div.classList.add("message", "system");
+        div.textContent = message;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (text === "" || socket.readyState !== WebSocket.OPEN) return;
+
+        socket.send(JSON.stringify({
+            type: "chat",
+            message: text
+        }));
+
+        messageInput.value = "";
+        messageInput.focus();
+    }
+
+    sendBtn.onclick = sendMessage;
+
+    messageInput.addEventListener("keyup", (event) => {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    });
+</script>
+
+</body>
+</html>
